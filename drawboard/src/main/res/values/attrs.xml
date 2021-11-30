@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="DrawBoardView">
+        <attr name="dbvMinZoom" format="float"/>
+        <attr name="dbvMaxZoom" format="float"/>
+        <attr name="dbvFit" format="boolean"/>
+        <attr name="dbvDrawEnabled" format="boolean"/>
+        <attr name="dbvZoomEnabled" format="boolean"/>
+        <attr name="dbvShowTouchPoint" format="boolean"/>
+        <attr name="android:src" />
+        <attr name="dbvPaintColor" format="color"/>
+        <attr name="dbvTouchPointColor" format="color"/>
+        <attr name="dbvDrawTextColor" format="color"/>
+        <attr name="dbvDrawTextSize" format="color"/>
+        <attr name="dbvDrawTextBold" format="boolean"/>
+        <attr name="dbvDrawTextUnderline" format="boolean"/>
+        <attr name="dbvTouchTolerance" format="float"/>
+        <attr name="dbvTouchPointRatio" format="float"/>
+    </declare-styleable>
+</resources>
