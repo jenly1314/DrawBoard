@@ -21,6 +21,13 @@ task clean(type: Delete) {
 }
 
 allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+allprojects {
     plugins.withId("com.vanniktech.maven.publish") {
         mavenPublish {
             sonatypeHost = "S01"

@@ -12,7 +12,7 @@
         <attr name="dbvPaintColor" format="color"/>
         <attr name="dbvTouchPointColor" format="color"/>
         <attr name="dbvDrawTextColor" format="color"/>
-        <attr name="dbvDrawTextSize" format="color"/>
+        <attr name="dbvDrawTextSize" format="dimension"/>
         <attr name="dbvDrawTextBold" format="boolean"/>
         <attr name="dbvDrawTextUnderline" format="boolean"/>
         <attr name="dbvTouchTolerance" format="float"/>

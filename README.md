@@ -23,6 +23,26 @@ DrawBoard 是一个自定义 View实现的画板；方便对图片进行各种�
 
 > 你也可以直接下载 [演示App](https://raw.githubusercontent.com/jenly1314/DrawBoard/master/app/release/app-release.apk) 体验效果
 
+## DrawBoardView自定义属性说明
+| 属性 | 属性类型 | 默认值 | 属性说明 |
+| :------| :------ | :------ | :------ |
+| dbvMinZoom | float |1.0| 支持最小的放大倍数 |
+| dbvMaxZoom | float |4.0| 支持最大的放大倍数 |
+| dbvFit | boolean |true| 是否自适应 |
+| dbvDrawEnabled | boolean |true| 是否启用绘图 |
+| dbvZoomEnabled | boolean |true| 是否启用缩放 |
+| dbvShowTouchPoint | boolean |true| 是否显示触摸点 |
+| android:src | drawable | | 设置图片（画板背景图层） |
+| dbvPaintColor | color |<font color=#FF0000>#FFFF0000</font>| 画笔的颜色 |
+| dbvTouchPointColor | color |<font color=#CCCCCC>#AFCCCCCC</font>| 触摸点的颜色 |
+| dbvDrawTextColor | color |<font color=#FF0000>#FFFF0000</font>| 绘制文本的颜色 |
+| dbvDrawTextSize | dimension | 15sp | 绘制文本的字体大小 |
+| dbvDrawTextBold | boolean | false | 绘制文本是否是粗体 |
+| dbvDrawTextUnderline | boolean | false | 绘制文本是否需要下划线 |
+| dbvTouchTolerance | float | 4.0 | 触摸时允许的容差值 |
+| dbvTouchPointRatio | float | 1.2 | 触摸点的比例 |
+
+
 ## 引入
 
 ### Gradle:
