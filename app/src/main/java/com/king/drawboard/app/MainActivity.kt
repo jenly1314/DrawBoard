@@ -25,7 +25,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.lang.Exception
-import kotlin.math.log
 
 class MainActivity : AppCompatActivity() {
 

@@ -4,17 +4,20 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BlendMode;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.PathEffect;
 import android.graphics.PixelFormat;
 import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.Shader;
 import android.graphics.Xfermode;
 import android.graphics.drawable.Drawable;
-import android.text.TextPaint;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
@@ -45,6 +48,7 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 /**
  * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
@@ -121,10 +125,6 @@ public class DrawBoardView extends View {
      */
     private Paint pointPaint;
     /**
-     * 文本画笔
-     */
-    private TextPaint textPaint;
-    /**
      * 画笔的颜色
      */
     private int paintColor = Color.RED;
@@ -132,10 +132,6 @@ public class DrawBoardView extends View {
      * 触摸点画笔的颜色
      */
     private int touchPointColor = 0xAFCCCCCC;
-    /**
-     * 文本画笔的颜色
-     */
-    private int drawTextColor = Color.RED;
     /**
      * 绘制文本的字体大小
      */
@@ -161,9 +157,25 @@ public class DrawBoardView extends View {
      */
     private float zoomPointStrokeWidth;
     /**
+     * 画笔的 Paint.Style
+     */
+    private Paint.Style paintStyle = Paint.Style.STROKE;
+    /**
+     * 画笔的着色器
+     */
+    private Shader paintShader;
+    /**
      * 画笔的 Xfermode
      */
     private Xfermode paintXfermode;
+    /**
+     * 画笔的 PathEffect
+     */
+    private PathEffect pathEffect;
+    /**
+     * 画笔的 BlendMode
+     */
+    private BlendMode blendMode;
     /**
      * 绘图模式
      */
@@ -416,8 +428,6 @@ public class DrawBoardView extends View {
                 paintColor = a.getColor(attr, Color.RED);
             }else if(attr == R.styleable.DrawBoardView_dbvTouchPointColor){
                 touchPointColor = a.getColor(attr, Color.RED);
-            }else if(attr == R.styleable.DrawBoardView_dbvDrawTextColor){
-                drawTextColor = a.getColor(attr, Color.RED);
             }else if(attr == R.styleable.DrawBoardView_dbvDrawTextSize){
                 drawTextSize = a.getDimension(attr, drawTextSize);
             }else if(attr == R.styleable.DrawBoardView_dbvDrawTextBold){
@@ -435,14 +445,6 @@ public class DrawBoardView extends View {
         pointPaint.setStyle(Paint.Style.FILL_AND_STROKE);
         pointPaint.setAntiAlias(true);
         pointPaint.setColor(touchPointColor);
-
-        textPaint = new TextPaint();
-        textPaint.setStyle(Paint.Style.FILL_AND_STROKE);
-        textPaint.setAntiAlias(true);
-        textPaint.setColor(drawTextColor);
-        textPaint.setTextSize(drawTextSize);
-        textPaint.setFakeBoldText(isFakeBoldText);
-        textPaint.setUnderlineText(isUnderlineText);
 
         drawList = new LinkedList<>();
         backupDrawList = new ArrayList<>();
@@ -708,7 +710,7 @@ public class DrawBoardView extends View {
     public void draw(@NonNull Draw draw){
         if(drawingCanvas != null){
             if(draw.getPaint() == null){//如果画笔为空则根据当前配置自动创建画笔，如果draw 是绘制其他有依赖的需自己配置后再传进来
-                draw.setPaint(createPaint(false));
+                draw.setPaint(createPaint(drawMode));
             }
             //进行绘制
             draw.draw(drawingCanvas);
@@ -811,25 +813,44 @@ public class DrawBoardView extends View {
 
     /**
      * 创建画笔
-     * @param isEraser
+     * @param drawMode
      * @return
      */
-    private Paint createPaint(boolean isEraser){
+    private Paint createPaint(int drawMode){
+
         Paint paint = new Paint();
-        paint.setStyle(Paint.Style.STROKE);
-        if(isEraser){//当为橡皮擦模式时
+        if (drawMode == DrawMode.ERASER) { // 当为橡皮擦模式时
+            paint.setStyle(Paint.Style.STROKE);
             paint.setColor(Color.BLACK);
             paint.setStrokeWidth(eraserStrokeWidth);
             paint.setAntiAlias(false);
             paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
-        }else{
+        } else if (drawMode == DrawMode.DRAW_TEXT) { // 当为绘制文本时
+            paint.setStyle(Paint.Style.FILL_AND_STROKE);
+            paint.setAntiAlias(true);
+            paint.setColor(paintColor);
+            paint.setTextSize(drawTextSize);
+            paint.setFakeBoldText(isFakeBoldText);
+            paint.setUnderlineText(isUnderlineText);
+        } else {
+            paint.setStyle(paintStyle);
             paint.setColor(paintColor);
             paint.setStrokeWidth(lineStrokeWidth);
             paint.setAntiAlias(true);
             paint.setStrokeJoin(Paint.Join.ROUND);
             paint.setStrokeCap(Paint.Cap.ROUND);
-            if(paintXfermode != null){
+
+            if (paintShader != null) {
+                paint.setShader(paintShader);
+            }
+            if (paintXfermode != null) {
                 paint.setXfermode(paintXfermode);
+            }
+            if (pathEffect != null) {
+                paint.setPathEffect(pathEffect);
+            }
+            if (blendMode != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                paint.setBlendMode(blendMode);
             }
         }
 
@@ -848,7 +869,7 @@ public class DrawBoardView extends View {
             try {
                 Draw draw = drawClass.newInstance();
                 if(draw instanceof DrawText){
-                    ((DrawText) draw).setTextPaint(textPaint);
+                    ((DrawText) draw).setTextPaint(paint);
                     ((DrawText) draw).setText(drawText);
                 }else if(draw instanceof DrawBitmap){
                     ((DrawBitmap) draw).setBitmap(drawBitmap);
@@ -876,7 +897,7 @@ public class DrawBoardView extends View {
                 if(isDrawEnabled && event.getPointerCount() == 1){//单指
                     isZoom = false;
                     isDraw = false;
-                    paint = createPaint(drawMode == DrawMode.ERASER);
+                    paint = createPaint(drawMode);
                     draw = createDraw(drawMode);
                     draw.setPaint(paint);
                     float x = event.getX();
@@ -1269,10 +1290,37 @@ public class DrawBoardView extends View {
         return touchPointColor;
     }
 
+    @NonNull
+    public Paint.Style getPaintStyle() {
+        return paintStyle;
+    }
+
     /**
-     * 获取画笔的Xfermode
+     * 设置画笔的 Paint.Style
+     * @param paintStyle
+     */
+    public void setPaintStyle(@NonNull Paint.Style paintStyle) {
+        this.paintStyle = paintStyle;
+    }
+
+    @Nullable
+    public Shader getPaintShader() {
+        return paintShader;
+    }
+
+    /**
+     * 设置画笔的 Shader
+     * @param paintShader
+     */
+    public void setPaintShader(@Nullable Shader paintShader) {
+        this.paintShader = paintShader;
+    }
+
+    /**
+     * 获取画笔的 Xfermode
      * @return
      */
+    @Nullable
     public Xfermode getPaintXfermode() {
         return paintXfermode;
     }
@@ -1281,8 +1329,36 @@ public class DrawBoardView extends View {
      * 设置画笔的 Xfermode
      * @param xfermode
      */
-    public void setPaintXfermode(Xfermode xfermode) {
+    public void setPaintXfermode(@Nullable Xfermode xfermode) {
         this.paintXfermode = xfermode;
+    }
+
+    @Nullable
+    public PathEffect getPathEffect() {
+        return pathEffect;
+    }
+
+    /**
+     * 设置画笔的 PathEffect
+     * @param pathEffect
+     */
+    public void setPathEffect(@Nullable PathEffect pathEffect) {
+        this.pathEffect = pathEffect;
+    }
+
+    @Nullable
+    public BlendMode getBlendMode() {
+        return blendMode;
+    }
+
+    /**
+     * 设置画笔的 BlendMode
+     * @param blendMode
+     */
+    @Nullable
+    @RequiresApi(Build.VERSION_CODES.Q)
+    public void setBlendMode(@Nullable BlendMode blendMode) {
+        this.blendMode = blendMode;
     }
 
     /**
@@ -1298,7 +1374,7 @@ public class DrawBoardView extends View {
      * @return
      */
     public int getDrawTextColor() {
-        return drawTextColor;
+        return paintColor;
     }
 
     /**
@@ -1306,7 +1382,7 @@ public class DrawBoardView extends View {
      * @param drawTextColor
      */
     public void setDrawTextColor(int drawTextColor) {
-        this.drawTextColor = drawTextColor;
+        this.paintColor = drawTextColor;
     }
 
     /**

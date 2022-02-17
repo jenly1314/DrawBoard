@@ -35,7 +35,6 @@ DrawBoard 是一个自定义 View实现的画板；方便对图片进行各种�
 | android:src | drawable | | 设置图片（画板背景图层） |
 | dbvPaintColor | color |<font color=#FF0000>#FFFF0000</font>| 画笔的颜色 |
 | dbvTouchPointColor | color |<font color=#CCCCCC>#AFCCCCCC</font>| 触摸点的颜色 |
-| dbvDrawTextColor | color |<font color=#FF0000>#FFFF0000</font>| 绘制文本的颜色 |
 | dbvDrawTextSize | dimension | 15sp | 绘制文本的字体大小 |
 | dbvDrawTextBold | boolean | false | 绘制文本是否是粗体 |
 | dbvDrawTextUnderline | boolean | false | 绘制文本是否需要下划线 |
@@ -60,7 +59,7 @@ allprojects {
 
 2. 在Module的 **build.gradle** 里面添加引入依赖项
 ```gradle
-implementation 'com.github.jenly1314:drawboard:1.0.0'
+implementation 'com.github.jenly1314:drawboard:1.0.1'
 
 ```
 
@@ -167,6 +166,9 @@ drawBoardView.getImageBitmap()
 
 
 ## 版本记录
+
+#### v1.0.1：2022-2-17
+*  对外提供更多Paint相关配置
 
 #### v1.0.0：2021-11-30
 *  DrawBoard初始版本
