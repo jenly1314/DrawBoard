@@ -77,6 +77,7 @@ DrawBoard 是一个自定义 View实现的画板；方便对图片进行编辑�
         android:layout_height="match_parent" />
 
 ```
+### 说明
 
 主要支持的绘制模式
 ```kotlin
@@ -123,7 +124,7 @@ DrawMode.ERASER
 DrawMode.MOSAIC
 
 ```
-> 如果以上操作不完全满足你的需求，`DrawBoard`对外还提供了很多可定制化的配置（例如：自定义实现一个 [**Draw**](drawboard/src/main/java/com/king/drawboard/draw/Draw.java)）。
+> 如果以上操作不完全满足你的需求，`DrawBoard`对外还提供了很多可定制化的配置（例如：自实现一个 [**Draw**](drawboard/src/main/java/com/king/drawboard/draw/Draw.java)）。
 
 ```kotlin
 /**
