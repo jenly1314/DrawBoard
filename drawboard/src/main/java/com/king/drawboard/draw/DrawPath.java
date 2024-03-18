@@ -4,14 +4,16 @@ import android.graphics.Canvas;
 import android.graphics.Path;
 
 /**
+ * 绘制路径
+ *
  * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
+ * <p>
+ * <a href="https://github.com/jenly1314">Follow me</a>
  */
 public class DrawPath extends Draw {
 
     private Path path;
 
-    private float lastX;
-    private float lastY;
 
     public DrawPath() {
         path = new Path();
@@ -25,19 +27,14 @@ public class DrawPath extends Draw {
     public void actionDown(Canvas canvas, float x, float y) {
         super.actionDown(canvas, x, y);
         path.moveTo(x, y);
-        lastX = x;
-        lastY = y;
     }
 
     @Override
     public void actionMove(Canvas canvas, float x, float y) {
-        super.actionMove(canvas, x, y);
         path.quadTo(lastX, lastY, (x + lastX) / 2, (y + lastY) / 2);
-        canvas.drawPath(path, paint);
-        lastX = x;
-        lastY = y;
+        super.actionMove(canvas, x, y);
+        draw(canvas);
     }
-
 
     @Override
     public void draw(Canvas canvas) {

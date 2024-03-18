@@ -4,13 +4,17 @@ import android.graphics.Canvas;
 import android.graphics.RectF;
 
 /**
+ * 绘制矩形
+ *
  * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
+ * <p>
+ * <a href="https://github.com/jenly1314">Follow me</a>
  */
 public class DrawRect extends Draw {
 
     private RectF rect;
 
-    public DrawRect(){
+    public DrawRect() {
         rect = new RectF();
     }
 
@@ -30,9 +34,8 @@ public class DrawRect extends Draw {
         super.actionMove(canvas, x, y);
         rect.right = x;
         rect.bottom = y;
-        canvas.drawRect(rect, paint);
+        draw(canvas);
     }
-
 
     @Override
     public void draw(Canvas canvas) {

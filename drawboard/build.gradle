@@ -1,39 +1,34 @@
 plugins {
-    id "com.android.library"
-    id "com.vanniktech.maven.publish"
+    id 'com.android.library'
+    id 'com.vanniktech.maven.publish'
 }
-//apply plugin: "com.android.library"
-//apply plugin: "com.vanniktech.maven.publish"
 
 android {
-    compileSdkVersion build_versions.compileSdk
-    buildToolsVersion build_versions.buildTools
+    namespace 'com.king.drawboard'
+    compileSdk build_versions.compileSdk
 
     defaultConfig {
-        minSdkVersion build_versions.minSdk
-        targetSdkVersion build_versions.targetSdk
-        versionCode app_version.versionCode
-        versionName app_version.versionName
+        minSdk build_versions.minSdk
+        targetSdk build_versions.targetSdk
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
     }
-
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-
-    lintOptions {
+    lint {
         abortOnError false
-        warning 'InvalidPackage'
     }
+
 }
 
 dependencies {
@@ -41,5 +36,5 @@ dependencies {
     testImplementation "junit:junit:$versions.junit"
     androidTestImplementation "androidx.test.ext:junit:$versions.androidExtJunit"
     androidTestImplementation "androidx.test.espresso:espresso-core:$versions.espressoCore"
-    compileOnly "androidx.appcompat:appcompat:$versions.appcompat"
+    implementation "androidx.annotation:annotation:$versions.annotation"
 }

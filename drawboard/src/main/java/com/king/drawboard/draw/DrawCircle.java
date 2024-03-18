@@ -1,17 +1,20 @@
 package com.king.drawboard.draw;
 
 import android.graphics.Canvas;
-import android.graphics.PointF;
 import android.graphics.RectF;
 
 /**
+ * 绘制圆
+ *
  * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
+ * <p>
+ * <a href="https://github.com/jenly1314">Follow me</a>
  */
 public class DrawCircle extends Draw {
 
     private RectF rect;
 
-    public DrawCircle(){
+    public DrawCircle() {
         rect = new RectF();
     }
 
@@ -31,11 +34,11 @@ public class DrawCircle extends Draw {
         super.actionMove(canvas, x, y);
         rect.right = x;
         rect.bottom = y;
-        canvas.drawCircle(rect.centerX(), rect.centerY(), Math.min(rect.width(), rect.height()),paint);
+        draw(canvas);
     }
 
     @Override
     public void draw(Canvas canvas) {
-        canvas.drawCircle(rect.centerX(), rect.centerY(), Math.min(rect.width(), rect.height()),paint);
+        canvas.drawCircle(rect.centerX(), rect.centerY(), Math.min(rect.width(), rect.height()), paint);
     }
 }

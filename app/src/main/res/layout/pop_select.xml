@@ -48,6 +48,13 @@
         android:src="@drawable/btn_menu_bitmap"
         style="@style/OnClick"/>
     <ImageView
+        android:id="@+id/ivMosaic"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="10dp"
+        android:src="@drawable/btn_menu_mosaic"
+        style="@style/OnClick"/>
+    <ImageView
         android:id="@+id/ivEraser"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

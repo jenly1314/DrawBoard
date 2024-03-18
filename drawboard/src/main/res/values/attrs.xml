@@ -8,13 +8,22 @@
         <attr name="dbvDrawEnabled" format="boolean"/>
         <attr name="dbvZoomEnabled" format="boolean"/>
         <attr name="dbvShowTouchPoint" format="boolean"/>
+        <attr name="dbvShowSelectedBox" format="boolean"/>
         <attr name="android:src" />
         <attr name="dbvPaintColor" format="color"/>
+        <attr name="dbvSelectedBoxColor" format="color"/>
         <attr name="dbvTouchPointColor" format="color"/>
+        <attr name="dbvLineStrokeWidth" format="dimension"/>
+        <attr name="dbvSelectedStrokeWidth" format="dimension"/>
+        <attr name="dbvEraserStrokeWidth" format="dimension"/>
+        <attr name="dbvMosaicStrokeWidth" format="dimension"/>
+        <attr name="dbvZoomPointStrokeWidth" format="dimension"/>
         <attr name="dbvDrawTextSize" format="dimension"/>
         <attr name="dbvDrawTextBold" format="boolean"/>
         <attr name="dbvDrawTextUnderline" format="boolean"/>
         <attr name="dbvTouchTolerance" format="float"/>
         <attr name="dbvTouchPointRatio" format="float"/>
+        <attr name="dbvDrawLineArrow" format="boolean"/>
+        <attr name="dbvLineArrowSize" format="dimension"/>
     </declare-styleable>
 </resources>

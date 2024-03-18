@@ -2,73 +2,59 @@ package com.king.drawboard.draw;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.PointF;
+import android.graphics.RectF;
+
+import androidx.annotation.Nullable;
 
 /**
+ * 绘制图片
+ *
  * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
+ * <p>
+ * <a href="https://github.com/jenly1314">Follow me</a>
  */
 public class DrawBitmap extends Draw {
 
     Bitmap bitmap;
 
-    private float lastX;
-    private float lastY;
-
-    private boolean isAnchorCenter;
+    private final RectF rect;
 
     public DrawBitmap() {
-    }
-
-    public Bitmap getBitmap() {
-        return bitmap;
+        rect = new RectF();
     }
 
     public void setBitmap(Bitmap bitmap) {
         this.bitmap = bitmap;
     }
 
-    public boolean isAnchorCenter() {
-        return isAnchorCenter;
-    }
-
-    public void setAnchorCenter(boolean anchorCenter) {
-        isAnchorCenter = anchorCenter;
-    }
-
-    public void setPoint(PointF point) {
-        this.lastX = point.x;
-        this.lastY = point.y;
-    }
-
-    @Override
-    public void actionDown(Canvas canvas, float x, float y) {
-        super.actionDown(canvas, x, y);
-        lastX = x;
-        lastY = y;
-    }
-
     @Override
     public void actionMove(Canvas canvas, float x, float y) {
         super.actionMove(canvas, x, y);
-        if(bitmap != null){
-            if(isAnchorCenter){
-                canvas.drawBitmap(bitmap, bitmap.getWidth() / 2 + x, bitmap.getHeight() / 2 + y, null);
-            }else{
-                canvas.drawBitmap(bitmap, x,  y, null);
-            }
+        draw(canvas);
+    }
+
+    @Override
+    public boolean canMove(float x, float y) {
+        return Math.abs(lastX - x) < bitmap.getWidth() / 2f && Math.abs(lastY - y) < bitmap.getHeight() / 2f;
+    }
+
+    @Nullable
+    @Override
+    public RectF getBoundingBox() {
+        if(bitmap != null) {
+            rect.left = lastX - bitmap.getWidth() / 2f;
+            rect.top = lastY - bitmap.getHeight() / 2f;
+            rect.right = rect.left + bitmap.getWidth();
+            rect.bottom = rect.top + bitmap.getHeight();
+            return rect;
         }
-        lastX = x;
-        lastY = y;
+        return super.getBoundingBox();
     }
 
     @Override
     public void draw(Canvas canvas) {
-        if(bitmap != null){
-            if(isAnchorCenter){
-                canvas.drawBitmap(bitmap, bitmap.getWidth() / 2 + lastX, bitmap.getHeight() / 2 + lastY, null);
-            }else{
-                canvas.drawBitmap(bitmap, lastX,  lastY, null);
-            }
+        if (bitmap != null) {
+            canvas.drawBitmap(bitmap, lastX - bitmap.getWidth() / 2f, lastY - bitmap.getHeight() / 2f, null);
         }
     }
 }

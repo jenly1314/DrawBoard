@@ -4,13 +4,17 @@ import android.graphics.Canvas;
 import android.graphics.RectF;
 
 /**
+ * 绘制椭圆
+ *
  * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
+ * <p>
+ * <a href="https://github.com/jenly1314">Follow me</a>
  */
 public class DrawOval extends Draw {
 
     private RectF rect;
 
-    public DrawOval(){
+    public DrawOval() {
         rect = new RectF();
     }
 
@@ -30,7 +34,7 @@ public class DrawOval extends Draw {
         super.actionMove(canvas, x, y);
         rect.right = x;
         rect.bottom = y;
-        canvas.drawOval(rect, paint);
+        draw(canvas);
     }
 
     @Override

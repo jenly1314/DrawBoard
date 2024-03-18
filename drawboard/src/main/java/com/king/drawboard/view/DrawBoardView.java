@@ -4,9 +4,11 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BitmapShader;
 import android.graphics.BlendMode;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.MaskFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PathEffect;
@@ -14,6 +16,7 @@ import android.graphics.PixelFormat;
 import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Xfermode;
 import android.graphics.drawable.Drawable;
@@ -23,6 +26,12 @@ import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
+
+import androidx.annotation.ColorInt;
+import androidx.annotation.DrawableRes;
+import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.king.drawboard.R;
 import com.king.drawboard.draw.Draw;
@@ -43,15 +52,19 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import androidx.annotation.ColorInt;
-import androidx.annotation.DrawableRes;
-import androidx.annotation.IntDef;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
-
 /**
+ * DrawBoard 是一个自定义 View实现的画板；方便对图片进行编辑和各种涂鸦相关操作。
+ * <p>
+ * 主要支持的一些操作：撤销、恢复、清空、缩放；
+ * <p>
+ * 主要支持的绘制模式：画路径、画点、画直线、画矩形、画椭圆、画圆、画文字、画图片、橡皮擦、马赛克等。
+ *
+ * <p>
+ * 具体支持的绘制模式可查看：{@link DrawMode}
+ *
  * @author <a href="mailto:jenly1314@gmail.com">Jenly</a>
+ * <p>
+ * <a href="https://github.com/jenly1314">Follow me</a>
  */
 public class DrawBoardView extends View {
 
@@ -117,13 +130,23 @@ public class DrawBoardView extends View {
      */
     private boolean isTouch;
     /**
-     * 画笔
-     */
-    private Paint paint;
-    /**
      * 触摸点画笔
      */
     private Paint pointPaint;
+    /**
+     * 选定时的画笔
+     */
+    private Paint selectedPaint;
+
+    /**
+     * 选中框颜色
+     */
+    private int selectedBoxColor = 0xAFFF0000;
+
+    /**
+     * 是否显示选中框
+     */
+    private boolean isShowSelectedBox = false;
     /**
      * 画笔的颜色
      */
@@ -145,15 +168,23 @@ public class DrawBoardView extends View {
      */
     private boolean isUnderlineText;
     /**
-     * 画笔线条描边宽度
+     * 画笔线条笔划宽度
      */
     private float lineStrokeWidth;
     /**
-     * 橡皮擦描边宽度
+     * 选中时边框笔划宽度
+     */
+    private float selectedStrokeWidth;
+    /**
+     * 橡皮擦笔划宽度
      */
     private float eraserStrokeWidth;
     /**
-     * 缩放点描边宽度
+     * 马赛克比笔划宽度
+     */
+    private float mosaicStrokeWidth;
+    /**
+     * 缩放点笔划宽度
      */
     private float zoomPointStrokeWidth;
     /**
@@ -176,6 +207,18 @@ public class DrawBoardView extends View {
      * 画笔的 BlendMode
      */
     private BlendMode blendMode;
+    /**
+     * 画笔的 MaskFilter
+     */
+    private MaskFilter maskFilter;
+    /**
+     * 绘制直线时是否带箭头
+     */
+    private boolean isDrawLineArrow;
+    /**
+     * 绘制直线时的箭头大小
+     */
+    private float lineArrowSize;
     /**
      * 绘图模式
      */
@@ -220,11 +263,11 @@ public class DrawBoardView extends View {
     /**
      * 支持最小的放大倍数
      */
-    private float minZoom = 1;
+    private float minZoom = 1f;
     /**
      * 支持最大的放大倍数
      */
-    private float maxZoom = 4;
+    private float maxZoom = 4f;
     /**
      * 是否自适应
      */
@@ -289,14 +332,20 @@ public class DrawBoardView extends View {
      * 需要绘制的位图
      */
     private Bitmap drawBitmap;
+
     /**
-     * 锚点是否居中
+     * 默认马赛克
      */
-    private boolean isDrawBitmapAnchorCenter;
+    private Bitmap defaultMosaicBitmap;
+    /**
+     * 马赛克
+     */
+    private Bitmap mosaicBitmap;
+
     /**
      * 用于存储所有支持的绘图模式
      */
-    private Map<Integer,Class<? extends Draw>> drawMap;
+    private Map<Integer, Class<? extends Draw>> drawMap;
     /**
      * 是否启用绘图
      */
@@ -327,11 +376,12 @@ public class DrawBoardView extends View {
     private OnDrawListener onDrawListener;
 
     /**
-     * 绘图模式
+     * 绘制模式
      */
     @IntDef({DrawMode.DRAW_PATH, DrawMode.DRAW_POINT, DrawMode.DRAW_LINE,
             DrawMode.DRAW_RECT, DrawMode.DRAW_OVAL, DrawMode.DRAW_CIRCLE,
-            DrawMode.DRAW_TEXT, DrawMode.DRAW_BITMAP, DrawMode.ERASER})
+            DrawMode.DRAW_TEXT, DrawMode.DRAW_BITMAP, DrawMode.ERASER,
+            DrawMode.MOSAIC})
     @Retention(RetentionPolicy.SOURCE)
     public @interface DrawMode {
         /**
@@ -370,11 +420,15 @@ public class DrawBoardView extends View {
          * 橡皮擦
          */
         int ERASER = 9;
+        /**
+         * 马赛克
+         */
+        int MOSAIC = 10;
     }
 
 
     public DrawBoardView(Context context) {
-        this(context,null);
+        this(context, null);
     }
 
     public DrawBoardView(Context context, @Nullable AttributeSet attrs) {
@@ -390,13 +444,21 @@ public class DrawBoardView extends View {
         init(context, attrs);
     }
 
-    private void init(Context context, @Nullable AttributeSet attrs){
-
+    /**
+     * 初始化
+     *
+     * @param context {@link Context}
+     * @param attrs   {@link AttributeSet}
+     */
+    private void init(Context context, @Nullable AttributeSet attrs) {
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        drawTextSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,15f,displayMetrics);
-        lineStrokeWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,2f,displayMetrics);
-        eraserStrokeWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,10f,displayMetrics);
-        zoomPointStrokeWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,6f,displayMetrics);
+        drawTextSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 15f, displayMetrics);
+        lineStrokeWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 2f, displayMetrics);
+        selectedStrokeWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1f, displayMetrics);
+        eraserStrokeWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 10f, displayMetrics);
+        mosaicStrokeWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 10f, displayMetrics);
+        zoomPointStrokeWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6f, displayMetrics);
+        lineArrowSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6f, displayMetrics);
 
         touchTolerance = TOUCH_TOLERANCE;
         touchPointRatio = TOUCH_POINT_RATIO;
@@ -404,47 +466,75 @@ public class DrawBoardView extends View {
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.DrawBoardView);
 
         int size = a.getIndexCount();
-        for(int i = 0;i < size;i++){
+        for (int i = 0; i < size; i++) {
             int attr = a.getIndex(i);
-            if(attr == R.styleable.DrawBoardView_dbvMinZoom){
+            if (attr == R.styleable.DrawBoardView_dbvMinZoom) {
                 minZoom = a.getFloat(attr, 1f);
-            }else if(attr == R.styleable.DrawBoardView_dbvMaxZoom){
+            } else if (attr == R.styleable.DrawBoardView_dbvMaxZoom) {
                 minZoom = a.getFloat(attr, 4f);
-            }else if(attr == R.styleable.DrawBoardView_dbvFit){
+            } else if (attr == R.styleable.DrawBoardView_dbvFit) {
                 isFit = a.getBoolean(attr, true);
-            }else if(attr == R.styleable.DrawBoardView_dbvDrawEnabled){
+            } else if (attr == R.styleable.DrawBoardView_dbvDrawEnabled) {
                 isDrawEnabled = a.getBoolean(attr, true);
-            }else if(attr == R.styleable.DrawBoardView_dbvZoomEnabled){
+            } else if (attr == R.styleable.DrawBoardView_dbvZoomEnabled) {
                 isZoomEnabled = a.getBoolean(attr, true);
-            }else if(attr == R.styleable.DrawBoardView_dbvShowTouchPoint){
+            } else if (attr == R.styleable.DrawBoardView_dbvShowTouchPoint) {
                 isShowTouchPoint = a.getBoolean(attr, true);
-            }else if(attr == R.styleable.DrawBoardView_android_src){
+            } else if (attr == R.styleable.DrawBoardView_dbvShowSelectedBox) {
+                isShowSelectedBox = a.getBoolean(attr, false);
+            } else if (attr == R.styleable.DrawBoardView_android_src) {
                 Drawable drawable = a.getDrawable(attr);
-                if(drawable != null){
+                if (drawable != null) {
                     originBitmap = getBitmapFormDrawable(drawable);
                     isChangeBitmap = true;
                 }
-            }else if(attr == R.styleable.DrawBoardView_dbvPaintColor){
+            } else if (attr == R.styleable.DrawBoardView_dbvPaintColor) {
                 paintColor = a.getColor(attr, Color.RED);
-            }else if(attr == R.styleable.DrawBoardView_dbvTouchPointColor){
-                touchPointColor = a.getColor(attr, Color.RED);
-            }else if(attr == R.styleable.DrawBoardView_dbvDrawTextSize){
+            } else if (attr == R.styleable.DrawBoardView_dbvSelectedBoxColor) {
+                selectedBoxColor = a.getColor(attr, 0xAFFF0000);
+            } else if (attr == R.styleable.DrawBoardView_dbvTouchPointColor) {
+                touchPointColor = a.getColor(attr, 0xAFCCCCCC);
+            } else if (attr == R.styleable.DrawBoardView_dbvLineStrokeWidth) {
+                lineStrokeWidth = a.getDimension(attr, lineStrokeWidth);
+            } else if (attr == R.styleable.DrawBoardView_dbvSelectedStrokeWidth) {
+                selectedStrokeWidth = a.getDimension(attr, selectedStrokeWidth);
+            } else if (attr == R.styleable.DrawBoardView_dbvEraserStrokeWidth) {
+                eraserStrokeWidth = a.getDimension(attr, eraserStrokeWidth);
+            } else if (attr == R.styleable.DrawBoardView_dbvMosaicStrokeWidth) {
+                mosaicStrokeWidth = a.getDimension(attr, mosaicStrokeWidth);
+            } else if (attr == R.styleable.DrawBoardView_dbvZoomPointStrokeWidth) {
+                zoomPointStrokeWidth = a.getDimension(attr, zoomPointStrokeWidth);
+            } else if (attr == R.styleable.DrawBoardView_dbvDrawTextSize) {
                 drawTextSize = a.getDimension(attr, drawTextSize);
-            }else if(attr == R.styleable.DrawBoardView_dbvDrawTextBold){
+            } else if (attr == R.styleable.DrawBoardView_dbvDrawTextBold) {
                 isFakeBoldText = a.getBoolean(attr, false);
-            }else if(attr == R.styleable.DrawBoardView_dbvDrawTextUnderline){
+            } else if (attr == R.styleable.DrawBoardView_dbvDrawTextUnderline) {
                 isUnderlineText = a.getBoolean(attr, false);
-            }else if(attr == R.styleable.DrawBoardView_dbvTouchTolerance){
+            } else if (attr == R.styleable.DrawBoardView_dbvTouchTolerance) {
                 touchTolerance = a.getFloat(attr, TOUCH_TOLERANCE);
+            } else if (attr == R.styleable.DrawBoardView_dbvDrawLineArrow) {
+                isDrawLineArrow = a.getBoolean(attr, false);
+            } else if (attr == R.styleable.DrawBoardView_dbvLineArrowSize) {
+                lineArrowSize = a.getDimension(attr, lineArrowSize);
             }
         }
 
         a.recycle();
 
         pointPaint = new Paint();
-        pointPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+        pointPaint.setFlags(Paint.ANTI_ALIAS_FLAG);
         pointPaint.setAntiAlias(true);
+        pointPaint.setStyle(Paint.Style.FILL_AND_STROKE);
         pointPaint.setColor(touchPointColor);
+
+        selectedPaint = new Paint();
+        selectedPaint.setFlags(Paint.ANTI_ALIAS_FLAG);
+        selectedPaint.setAntiAlias(true);
+        selectedPaint.setStyle(Paint.Style.STROKE);
+        selectedPaint.setStrokeJoin(Paint.Join.ROUND);
+        selectedPaint.setStrokeCap(Paint.Cap.ROUND);
+        selectedPaint.setStrokeWidth(selectedStrokeWidth);
+        selectedPaint.setColor(selectedBoxColor);
 
         drawList = new LinkedList<>();
         backupDrawList = new ArrayList<>();
@@ -454,13 +544,14 @@ public class DrawBoardView extends View {
 
     /**
      * 获取 {@link Bitmap}
+     *
      * @param drawable
      * @return
      */
-    private Bitmap getBitmapFormDrawable(@NonNull Drawable drawable){
-        Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(),drawable.getIntrinsicHeight(),drawable.getOpacity() != PixelFormat.OPAQUE ? Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565);
+    private Bitmap getBitmapFormDrawable(@NonNull Drawable drawable) {
+        Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(), drawable.getOpacity() != PixelFormat.OPAQUE ? Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565);
         Canvas canvas = new Canvas(bitmap);
-        drawable.setBounds(0,0,bitmap.getWidth(),bitmap.getHeight());
+        drawable.setBounds(0, 0, bitmap.getWidth(), bitmap.getHeight());
         drawable.draw(canvas);
         return bitmap;
     }
@@ -468,7 +559,7 @@ public class DrawBoardView extends View {
     /**
      * 初始化支持的绘图模式
      */
-    private void initDrawMap(){
+    private void initDrawMap() {
         drawMap = new HashMap<>();
         drawMap.put(DrawMode.DRAW_PATH, DrawPath.class);
         drawMap.put(DrawMode.DRAW_POINT, DrawPoint.class);
@@ -479,49 +570,54 @@ public class DrawBoardView extends View {
         drawMap.put(DrawMode.DRAW_TEXT, DrawText.class);
         drawMap.put(DrawMode.DRAW_BITMAP, DrawBitmap.class);
         drawMap.put(DrawMode.ERASER, DrawPath.class);
+        drawMap.put(DrawMode.MOSAIC, DrawPath.class);
     }
 
     /**
      * 获取支持的绘图模式
-     * @return
+     *
+     * @return {@link DrawBoardView#drawMap}
      */
-    public Map<Integer,Class<? extends Draw>> getDrawMap(){
+    public Map<Integer, Class<? extends Draw>> getDrawMap() {
         return drawMap;
     }
 
     /**
      * 设置图片
+     *
      * @param drawableId
      */
-    public void setImageResource(@DrawableRes int drawableId){
+    public void setImageResource(@DrawableRes int drawableId) {
         setImageBitmap(BitmapFactory.decodeResource(getResources(), drawableId));
     }
 
     /**
      * 设置图片（画板背景图层）
-     * @param bitmap
+     *
+     * @param bitmap 画板背景原图
      */
-    public void setImageBitmap(Bitmap bitmap){
-        if(bitmap != null){
+    public void setImageBitmap(Bitmap bitmap) {
+        if (bitmap != null) {
             originBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
             drawList.clear();
             backupDrawList.clear();
             matrix.reset();
             isChangeBitmap = true;
-        }else{
+        } else {
             originBitmap = null;
         }
         invalidate();
     }
 
     /**
-     * 获取图片（画板背景图层和画板图层合并后的图片）
-     * @return
+     * 获取结果图片（画板背景图层和画板图层合并后的图片）
+     *
+     * @return {@link Bitmap}
      */
-    public Bitmap getImageBitmap(){
+    public Bitmap getResultBitmap() {
         Bitmap bitmap = null;
-        if(originBitmap != null){
-            bitmap = Bitmap.createBitmap(originBitmap.getWidth(),originBitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        if (originBitmap != null) {
+            bitmap = Bitmap.createBitmap(originBitmap.getWidth(), originBitmap.getHeight(), Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
             drawBitmap(canvas, new Matrix(), false);
         }
@@ -529,10 +625,22 @@ public class DrawBoardView extends View {
     }
 
     /**
+     * 获取结果图片（画板背景图层和画板图层合并后的图片）
+     *
+     * @return {@link Bitmap}
+     * @deprecated 使用 {@link #getResultBitmap()}
+     */
+    public Bitmap getImageBitmap() {
+        return getResultBitmap();
+    }
+
+    /**
      * 更新图片
      */
-    private synchronized void updateImageBitmap(){
-        if(originBitmap == null){//如果原始图片为空，则创建一个和控件视图宽高一致的图片
+    private synchronized void updateImageBitmap() {
+
+        if (originBitmap == null) {
+            //如果原始图片为空，则创建一个和控件视图宽高一致的图片
             originBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 
             //创建绘图层和预览层画布相关
@@ -553,21 +661,22 @@ public class DrawBoardView extends View {
             currentBitmapWidth = width;
             currentBitmapHeight = height;
 
-            if(onZoomListener != null){
+            if (onZoomListener != null) {
                 onZoomListener.onZoomUpdate(getRealZoom(), getZoom());
             }
 
-        }else if(isChangeBitmap){//如果图片发生了改变，则需要重新计算
+        } else if (isChangeBitmap) {
+            //如果图片发生了改变，则需要重新计算
             isChangeBitmap = false;
             matrix.reset();
             int bitmapWidth = originBitmap.getWidth();
             int bitmapHeight = originBitmap.getHeight();
 
             //如果图片的宽或高 大于控件视图的宽或高
-            if(isFit || bitmapWidth > width || bitmapHeight > height){
-                float wRatio = width / (float)bitmapWidth;
-                float hRatio = height / (float)bitmapHeight;
-                if(wRatio < hRatio){//图片宽铺满时
+            if (isFit || bitmapWidth > width || bitmapHeight > height) {
+                float wRatio = width / (float) bitmapWidth;
+                float hRatio = height / (float) bitmapHeight;
+                if (wRatio < hRatio) {//图片宽铺满时
                     //以宽的比例进行等比例缩放保证图片能完全显示
                     matrix.postScale(wRatio, wRatio);
                     float translateY = (height - (bitmapHeight * wRatio)) / 2f;
@@ -578,7 +687,7 @@ public class DrawBoardView extends View {
                     currentTranslateY = translateY;
                     initRatio = wRatio;
                     currentRatio = wRatio;
-                }else{//图片高铺满时
+                } else {//图片高铺满时
                     //以高的比例进行等比例缩放保证图片能完全显示
                     matrix.postScale(hRatio, hRatio);
                     float translateX = (width - (bitmapWidth * hRatio)) / 2f;
@@ -591,7 +700,7 @@ public class DrawBoardView extends View {
                     currentRatio = hRatio;
                 }
 
-            }else{
+            } else {
                 //图片的宽和高都小于控件视图的宽和高，则直接将图片居中显示
                 float translateY = (height - bitmapHeight) / 2f;
                 float translateX = (width - bitmapWidth) / 2f;
@@ -614,7 +723,7 @@ public class DrawBoardView extends View {
             touchBitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
             touchCanvas = new Canvas(touchBitmap);
 
-            if(onZoomListener != null){
+            if (onZoomListener != null) {
                 onZoomListener.onZoomUpdate(getRealZoom(), getZoom());
             }
         }
@@ -624,7 +733,7 @@ public class DrawBoardView extends View {
     /**
      * 清除画布
      */
-    public void clear(){
+    public void clear() {
         drawingCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
         drawList.clear();
         backupDrawList.clear();
@@ -636,23 +745,23 @@ public class DrawBoardView extends View {
     /**
      * 撤销一步
      */
-    public void undo(){
-        if(!drawList.isEmpty()){
+    public void undo() {
+        if (!drawList.isEmpty()) {
             drawingCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
             //删除最后一步
             drawList.removeLast();
             //然后将画图记录重新画上去
-            for(Draw draw: drawList){
+            for (Draw draw : drawList) {
                 draw.draw(drawingCanvas);
             }
             invalidate();
             isRevoked = true;
             hasRedo = true;
             //判断是否撤销到最后一步
-            if(drawList.isEmpty()){
+            if (drawList.isEmpty()) {
                 hasUndo = false;
             }
-        }else{
+        } else {
             hasUndo = false;
         }
     }
@@ -660,27 +769,27 @@ public class DrawBoardView extends View {
     /**
      * 恢复一步（反撤销）
      */
-    public void redo(){
+    public void redo() {
         int backupSize = backupDrawList.size();
-        if(backupSize > 0){
+        if (backupSize > 0) {
             int size = drawList.size();
-            if(size < backupSize){
+            if (size < backupSize) {
                 drawingCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-                if(size == 0){//size为0时，表示已经撤销到最后一步了
+                if (size == 0) {//size为0时，表示已经撤销到最后一步了
                     drawList.add(backupDrawList.get(0));
-                }else{//恢复一步即可
+                } else {//恢复一步即可
                     drawList.add(backupDrawList.get(size));
                 }
                 //提前判断是否恢复到最后一步
-                if(size + 1 == backupSize){
+                if (size + 1 == backupSize) {
                     hasRedo = false;
                 }
                 //然后将画图记录重新画上去
-                for(Draw draw: drawList){
+                for (Draw draw : drawList) {
                     draw.draw(drawingCanvas);
                 }
                 invalidate();
-            }else{
+            } else {
                 hasRedo = false;
             }
         }
@@ -690,7 +799,8 @@ public class DrawBoardView extends View {
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
-        if(changed){//当布局发生改变时，记住控件视图的宽高
+        if (changed) {
+            //当布局发生改变时，记住控件视图的宽高
             width = getWidth();
             height = getHeight();
         }
@@ -705,96 +815,115 @@ public class DrawBoardView extends View {
     /**
      * 通过代码进行绘制
      * 需要注意：绘制原始坐标点需要转换成矩阵上的坐标点；{@link #transfer(PointF)}
-     * @param draw
+     *
+     * @param draw {@link Draw}
      */
-    public void draw(@NonNull Draw draw){
-        if(drawingCanvas != null){
-            if(draw.getPaint() == null){//如果画笔为空则根据当前配置自动创建画笔，如果draw 是绘制其他有依赖的需自己配置后再传进来
+    public void draw(@NonNull Draw draw) {
+        if (drawingCanvas != null) {
+            //如果画笔为空则根据当前配置自动创建画笔，如果draw 是绘制其他有依赖的需自己配置后再传进来
+            if (draw.getPaint() == null) {
                 draw.setPaint(createPaint(drawMode));
             }
-            //进行绘制
-            draw.draw(drawingCanvas);
-            //将绘制记录保存起来，便于后续的撤销和恢复相关操作
-            drawList.add(draw);
-            if(isRevoked){
-                backupDrawList.clear();
-                backupDrawList.addAll(drawList);
-                hasRedo = false;
-                isRevoked = false;
-            }else{
-                backupDrawList.add(draw);
-            }
-            hasUndo = true;
-            if(onDrawListener != null){
-                onDrawListener.onDraw(draw);
-            }
+            draw(draw, true);
+        }
+    }
 
+    /**
+     * 绘制
+     *
+     * @param draw         {@link Draw}
+     * @param isInvalidate 是否刷新绘制
+     */
+    private void draw(Draw draw, Boolean isInvalidate) {
+        //进行绘制
+        draw.draw(drawingCanvas);
+        //将绘制记录保存起来，便于后续的撤销和恢复相关操作
+        drawList.add(draw);
+        if (isRevoked) {
+            backupDrawList.clear();
+            backupDrawList.addAll(drawList);
+            hasRedo = false;
+            isRevoked = false;
+        } else {
+            backupDrawList.add(draw);
+        }
+        hasUndo = true;
+        if (onDrawListener != null) {
+            onDrawListener.onDraw(draw);
+        }
+
+        if (isInvalidate) {
             invalidate();
         }
     }
 
     /**
      * 将原始点坐标转换成画布矩阵上的点坐标，当通过代码调用{@link #draw(Draw)}绘制时可能会用到此转换方法
+     *
      * @param point
      */
-    public void transfer(PointF point){
+    public void transfer(PointF point) {
         point.x = (point.x - currentTranslateX) / currentRatio;
         point.y = (point.y - currentTranslateY) / currentRatio;
     }
 
     /**
      * 绘制图片
+     *
      * @param canvas
      */
-    private void drawBitmap(Canvas canvas, Matrix matrix, boolean isTouch){
+    private void drawBitmap(Canvas canvas, Matrix matrix, boolean isTouch) {
         updateImageBitmap();
 
-        if(originBitmap != null){
+        if (originBitmap != null) {
             canvas.drawBitmap(originBitmap, matrix, null);
         }
-        if(drawingBitmap != null){
+        if (drawingBitmap != null) {
             canvas.drawBitmap(drawingBitmap, matrix, null);
         }
-        if(previewBitmap != null){
+        if (previewBitmap != null) {
             canvas.drawBitmap(previewBitmap, matrix, null);
         }
-        if(isShowTouchPoint && isTouch && touchBitmap != null){
+        if (isShowTouchPoint && isTouch && touchBitmap != null) {
             canvas.drawBitmap(touchBitmap, matrix, null);
         }
     }
 
     /**
      * 绘制触摸点
+     *
      * @param x
      * @param y
      */
-    private void drawTouchPoint(float x, float y){
+    private void drawTouchPoint(float x, float y) {
         touchCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-        if(drawMode == DrawMode.ERASER){
+        if (drawMode == DrawMode.ERASER) {
             drawTouchPoint(touchCanvas, x, y, eraserStrokeWidth / 2 * touchPointRatio);
-        }else{
+        } else {
             drawTouchPoint(touchCanvas, x, y, lineStrokeWidth / 2 * touchPointRatio);
         }
     }
 
     /**
      * 绘制缩放时触摸点
+     *
      * @param x
      * @param y
      */
-    private void drawZoomPoint(float x, float y){
+    private void drawZoomPoint(float x, float y) {
         touchCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
         drawTouchPoint(touchCanvas, x, y, zoomPointStrokeWidth / 2 * touchPointRatio);
     }
 
     /**
      * 绘制缩放时触摸点
+     *
      * @param x0
      * @param y0
      * @param x1
      * @param y1
      */
-    private void drawZoomPoint(float x0, float y0, float x1, float y1){
+    private void drawZoomPoint(float x0, float y0, float x1, float y1) {
         touchCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
         drawTouchPoint(touchCanvas, x0, y0, zoomPointStrokeWidth);
         drawTouchPoint(touchCanvas, x1, y1, zoomPointStrokeWidth);
@@ -802,41 +931,73 @@ public class DrawBoardView extends View {
 
     /**
      * 绘制触摸点
+     *
      * @param canvas
      * @param x
      * @param y
      * @param radius
      */
-    private void drawTouchPoint(Canvas canvas,float x, float y, float radius){
+    private void drawTouchPoint(Canvas canvas, float x, float y, float radius) {
         canvas.drawCircle(x, y, radius, pointPaint);
     }
 
     /**
+     * 获取马赛克着色器位图
+     *
+     * @return
+     */
+    private Bitmap obtainMosaicBitmap() {
+        if (mosaicBitmap != null) {
+            return mosaicBitmap;
+        }
+        if (defaultMosaicBitmap == null) {
+            defaultMosaicBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.drawboard_mosaic);
+        }
+        return defaultMosaicBitmap;
+    }
+
+    /**
      * 创建画笔
+     *
      * @param drawMode
      * @return
      */
-    private Paint createPaint(int drawMode){
+    private Paint createPaint(int drawMode) {
 
         Paint paint = new Paint();
+        paint.setFlags(Paint.ANTI_ALIAS_FLAG);
+        paint.setAntiAlias(true);
         if (drawMode == DrawMode.ERASER) { // 当为橡皮擦模式时
             paint.setStyle(Paint.Style.STROKE);
             paint.setColor(Color.BLACK);
             paint.setStrokeWidth(eraserStrokeWidth);
-            paint.setAntiAlias(false);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeCap(Paint.Cap.ROUND);
             paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
         } else if (drawMode == DrawMode.DRAW_TEXT) { // 当为绘制文本时
             paint.setStyle(Paint.Style.FILL_AND_STROKE);
-            paint.setAntiAlias(true);
+            paint.setTextAlign(Paint.Align.CENTER);
             paint.setColor(paintColor);
             paint.setTextSize(drawTextSize);
             paint.setFakeBoldText(isFakeBoldText);
             paint.setUnderlineText(isUnderlineText);
+        } else if (drawMode == DrawMode.MOSAIC) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setColor(Color.BLACK);
+            paint.setStrokeWidth(mosaicStrokeWidth);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setShader(new BitmapShader(obtainMosaicBitmap(), Shader.TileMode.REPEAT, Shader.TileMode.REPEAT));
         } else {
-            paint.setStyle(paintStyle);
+
+            if (drawMode == DrawMode.DRAW_LINE) {
+                paint.setStyle(Paint.Style.FILL_AND_STROKE);
+            } else {
+                paint.setStyle(paintStyle);
+            }
+
             paint.setColor(paintColor);
             paint.setStrokeWidth(lineStrokeWidth);
-            paint.setAntiAlias(true);
             paint.setStrokeJoin(Paint.Join.ROUND);
             paint.setStrokeCap(Paint.Cap.ROUND);
 
@@ -849,6 +1010,9 @@ public class DrawBoardView extends View {
             if (pathEffect != null) {
                 paint.setPathEffect(pathEffect);
             }
+            if (maskFilter != null) {
+                paint.setMaskFilter(maskFilter);
+            }
             if (blendMode != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 paint.setBlendMode(blendMode);
             }
@@ -857,70 +1021,84 @@ public class DrawBoardView extends View {
         return paint;
     }
 
-
     /**
      * 创建绘图对象
+     *
      * @param drawMode
      * @return
      */
-    private Draw createDraw(@DrawMode int drawMode){
+    private Draw createDraw(@DrawMode int drawMode) {
         Class<? extends Draw> drawClass = drawMap.get(drawMode);
-        if(drawClass != null){
+        if (drawClass != null) {
             try {
                 Draw draw = drawClass.newInstance();
-                if(draw instanceof DrawText){
-                    ((DrawText) draw).setTextPaint(paint);
+                draw.setPaint(createPaint(drawMode));
+
+                if (draw instanceof DrawLine) {
+                    ((DrawLine) draw).setDrawArrow(isDrawLineArrow);
+                    ((DrawLine) draw).setArrowSize(lineArrowSize);
+                } else if (draw instanceof DrawText) {
                     ((DrawText) draw).setText(drawText);
-                }else if(draw instanceof DrawBitmap){
+                } else if (draw instanceof DrawBitmap) {
                     ((DrawBitmap) draw).setBitmap(drawBitmap);
-                    ((DrawBitmap) draw).setAnchorCenter(isDrawBitmapAnchorCenter);
                 }
                 return draw;
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        return new Draw(){
-            @Override
-            public void draw(Canvas canvas) {
 
-            }
-        };
+        throw new IllegalArgumentException("drawMode = " + drawMode);
     }
-
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         isTouch = true;
-        switch (event.getActionMasked()){
+        switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                if(isDrawEnabled && event.getPointerCount() == 1){//单指
+                if (isDrawEnabled && event.getPointerCount() == 1) {
+                    //单指
                     isZoom = false;
                     isDraw = false;
-                    paint = createPaint(drawMode);
-                    draw = createDraw(drawMode);
-                    draw.setPaint(paint);
-                    float x = event.getX();
-                    float y = event.getY();
-                    float ratioX = (x - currentTranslateX) / currentRatio;
-                    float ratioY = (y - currentTranslateY) / currentRatio;
-                    if(isShowTouchPoint){
-                        touchCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-                    }
-                    if(drawMode == DrawMode.ERASER){//如果是橡皮擦模式，则直接使用绘制层画布
-                        draw.actionDown(drawingCanvas, ratioX, ratioY);
-                    }else{
-                        //绘制前先清空预览画布
-                        previewCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-                        draw.actionDown(previewCanvas, ratioX, ratioY);
-                    }
 
                     lastX = event.getX();
                     lastY = event.getY();
+                    float ratioX = (lastX - currentTranslateX) / currentRatio;
+                    float ratioY = (lastY - currentTranslateY) / currentRatio;
+                    Draw tempDraw = null;
+                    if (!drawList.isEmpty()) {
+                        Draw lastDraw = drawList.getLast();
+                        if (lastDraw.canMove(ratioX, ratioY)) {
+                            tempDraw = lastDraw;
+                        }
+                    }
+                    if (tempDraw != null) {
+                        undo();
+                        draw = tempDraw;
+                        draw.draw(previewCanvas);
+                        isDraw = true;
+                        drawSelectedBoundingBox(previewCanvas, draw);
+                    } else {
+                        draw = createDraw(drawMode);
+                    }
+
+                    if (isShowTouchPoint) {
+                        touchCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+                    }
+                    if (drawMode == DrawMode.ERASER) {
+                        //如果是橡皮擦模式，则直接使用绘制层画布
+                        draw.actionDown(drawingCanvas, ratioX, ratioY);
+                    } else {
+                        //绘制前先清空预览画布
+                        draw.actionDown(previewCanvas, ratioX, ratioY);
+                    }
+
                 }
                 break;
             case MotionEvent.ACTION_POINTER_DOWN:
-                if(isZoomEnabled && event.getPointerCount() >= 2){//多指：判定为缩放
+
+                if (isZoomEnabled && event.getPointerCount() >= 2) {
+                    //多指：判定为缩放
                     isZoom = true;
                     float xPoint0 = event.getX(0);
                     float yPoint0 = event.getY(0);
@@ -937,67 +1115,56 @@ public class DrawBoardView extends View {
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
-                if(isDrawEnabled && !isZoom){
+                if (isDrawEnabled && !isZoom) {
                     float x = event.getX();
                     float y = event.getY();
-                    if(Math.abs(lastX - x) > touchTolerance || Math.abs(lastY - y) > touchTolerance){
+                    if (Math.abs(lastX - x) > touchTolerance || Math.abs(lastY - y) > touchTolerance) {
                         isDraw = true;
                         float ratioX = (x - currentTranslateX) / currentRatio;
                         float ratioY = (y - currentTranslateY) / currentRatio;
-                        if(drawMode == DrawMode.ERASER){//如果是橡皮擦模式，则直接使用绘制层画布
+                        if (drawMode == DrawMode.ERASER) {
+                            //如果是橡皮擦模式，则直接使用绘制层画布
                             draw.actionMove(drawingCanvas, ratioX, ratioY);
-                        }else{
+                        } else {
                             //绘制前先清空预览画布
                             previewCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                             draw.actionMove(previewCanvas, ratioX, ratioY);
+                            drawSelectedBoundingBox(previewCanvas, draw);
                         }
-                        if(isShowTouchPoint){
+                        if (isShowTouchPoint) {
                             drawTouchPoint(ratioX, ratioY);
                         }
                         lastX = x;
                         lastY = y;
                     }
-                }else if(isZoomEnabled && isZoom){
+                } else if (isZoomEnabled && isZoom) {
                     processZoomEvent(event);
                 }
                 break;
             case MotionEvent.ACTION_POINTER_UP:
-                if(isShowTouchPoint){
+                if (isShowTouchPoint) {
                     touchCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                 }
                 break;
             case MotionEvent.ACTION_UP:
-                if(isShowTouchPoint){
+                if (isShowTouchPoint) {
                     touchCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                 }
-                if(draw != null && isDraw){
+                if (draw != null && isDraw) {
                     float x = event.getX();
                     float y = event.getY();
                     float ratioX = (x - currentTranslateX) / currentRatio;
                     float ratioY = (y - currentTranslateY) / currentRatio;
-                    if(drawMode == DrawMode.ERASER){//如果是橡皮擦模式，则直接使用绘制层画布
+                    if (drawMode == DrawMode.ERASER) {
+                        //如果是橡皮擦模式，则直接使用绘制层画布
                         draw.actionUp(drawingCanvas, ratioX, ratioY);
-                    }else {
+                    } else {
                         //绘制前先清空预览画布
                         previewCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                         draw.actionUp(previewCanvas, ratioX, ratioY);
                     }
-                    //将之前绘制预览的结果绘制在图层上
-                    draw.draw(drawingCanvas);
-                    //将绘制记录保存起来，便于后续的撤销和恢复相关操作
-                    drawList.add(draw);
-                    if(isRevoked){
-                        backupDrawList.clear();
-                        backupDrawList.addAll(drawList);
-                        hasRedo = false;
-                        isRevoked = false;
-                    }else{
-                        backupDrawList.add(draw);
-                    }
-                    hasUndo = true;
-                    if(onDrawListener != null){
-                        onDrawListener.onDraw(draw);
-                    }
+                    // 绘制
+                    draw(draw, false);
                 }
                 lastX = -1;
                 lastY = -1;
@@ -1009,19 +1176,32 @@ public class DrawBoardView extends View {
                 break;
         }
         invalidate();
-
         return true;
     }
 
+    /**
+     * 绘制选中边界框
+     *
+     * @param canvas
+     * @param draw
+     */
+    private void drawSelectedBoundingBox(Canvas canvas, Draw draw) {
+        if (isShowSelectedBox) {
+            RectF rect = draw.getBoundingBox();
+            if (rect != null) {
+                canvas.drawRect(rect, selectedPaint);
+            }
+        }
+    }
 
     /**
      * 处理缩放事件
+     *
      * @param event
      */
-    private void processZoomEvent(MotionEvent event){
-
+    private void processZoomEvent(MotionEvent event) {
         int pointCount = event.getPointerCount();
-        if(pointCount >= 2){//多指时，计算缩放和平移
+        if (pointCount >= 2) {//多指时，计算缩放和平移
             float xPoint0 = event.getX(0);
             float yPoint0 = event.getY(0);
             float xPoint1 = event.getX(1);
@@ -1036,22 +1216,22 @@ public class DrawBoardView extends View {
             scaledRatio = fingerDistance / lastFingerDistance;
 
             //缩放比例
-            if(scaledRatio < 1f){//两点之间的距离小于上一次，表示缩小
+            if (scaledRatio < 1f) {//两点之间的距离小于上一次，表示缩小
                 float minRatio = isFit ? initRatio : minZoom;
-                if(currentRatio > minRatio){
+                if (currentRatio > minRatio) {
                     currentRatio = currentRatio * scaledRatio;
                     //边界处理，currentRatio 最小不得小于 minRatio
-                    if(currentRatio < minRatio){
+                    if (currentRatio < minRatio) {
                         currentRatio = minRatio;
                     }
                 }
 
-            }else{//反之，表示放大
+            } else {//反之，表示放大
                 float maxRatio = isFit ? Math.max(initRatio, maxZoom) : maxZoom;
-                if(currentRatio < maxZoom){
+                if (currentRatio < maxZoom) {
                     currentRatio = currentRatio * scaledRatio;
                     //边界处理，currentRatio 最大不得大于 maxRatio
-                    if(currentRatio > maxRatio){
+                    if (currentRatio > maxRatio) {
                         currentRatio = maxRatio;
                     }
                 }
@@ -1069,7 +1249,7 @@ public class DrawBoardView extends View {
 
             lastFingerDistance = fingerDistance;
 
-        }else{//单指时，只计算平移
+        } else {//单指时，只计算平移
             movedDistanceX = event.getX() - lastX;
             movedDistanceY = event.getY() - lastY;
         }
@@ -1089,8 +1269,8 @@ public class DrawBoardView extends View {
         zoom(lastCenterPointX, lastCenterPointY);
 
         //如果需要显示触摸点，则进行显示
-        if(isShowTouchPoint){
-            if(pointCount >= 2){
+        if (isShowTouchPoint) {
+            if (pointCount >= 2) {
                 float xPoint0 = event.getX(0);
                 float yPoint0 = event.getY(0);
                 float xPoint1 = event.getX(1);
@@ -1100,7 +1280,7 @@ public class DrawBoardView extends View {
                 float ratioX1 = (xPoint1 - currentTranslateX) / currentRatio;
                 float ratioY1 = (yPoint1 - currentTranslateY) / currentRatio;
                 drawZoomPoint(ratioX0, ratioY0, ratioX1, ratioY1);
-            }else{
+            } else {
                 float xPoint0 = event.getX(0);
                 float yPoint0 = event.getY(0);
                 float ratioX0 = (xPoint0 - currentTranslateX) / currentRatio;
@@ -1115,10 +1295,11 @@ public class DrawBoardView extends View {
 
     /**
      * 矩阵缩放
+     *
      * @param centerPointX
      * @param centerPointY
      */
-    private void zoom(float centerPointX, float centerPointY){
+    private void zoom(float centerPointX, float centerPointY) {
         matrix.reset();
         // 将图片按总缩放比例进行缩放
         matrix.postScale(currentRatio, currentRatio);
@@ -1160,13 +1341,14 @@ public class DrawBoardView extends View {
         currentBitmapWidth = (int) scaledWidth;
         currentBitmapHeight = (int) scaledHeight;
 
-        if(onZoomListener != null){
+        if (onZoomListener != null) {
             onZoomListener.onZoomUpdate(getRealZoom(), getZoom());
         }
     }
 
     /**
      * 计算两点之间的距离
+     *
      * @param x0
      * @param y0
      * @param x1
@@ -1176,11 +1358,12 @@ public class DrawBoardView extends View {
     private float distance(float x0, float y0, float x1, float y1) {
         float disX = Math.abs(x0 - x1);
         float disY = Math.abs(y0 - y1);
-        return (float)Math.sqrt(disX * disX + disY * disY);
+        return (float) Math.sqrt(disX * disX + disY * disY);
     }
 
     /**
      * 获取绘图模式
+     *
      * @return
      */
     @DrawMode
@@ -1190,6 +1373,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置绘图模式
+     *
      * @param drawMode
      */
     public void setDrawMode(@DrawMode int drawMode) {
@@ -1198,10 +1382,11 @@ public class DrawBoardView extends View {
 
     /**
      * 获取图片的宽度
+     *
      * @return
      */
     public int getBitmapWidth() {
-        if(originBitmap != null){
+        if (originBitmap != null) {
             return originBitmap.getWidth();
         }
         return width;
@@ -1209,10 +1394,11 @@ public class DrawBoardView extends View {
 
     /**
      * 获取图片的高度
+     *
      * @return
      */
     public int getBitmapHeight() {
-        if(originBitmap != null){
+        if (originBitmap != null) {
             return originBitmap.getHeight();
         }
         return height;
@@ -1220,6 +1406,7 @@ public class DrawBoardView extends View {
 
     /**
      * 获取当前图片的宽度，缩放的宽度
+     *
      * @return
      */
     public int getCurrentBitmapWidth() {
@@ -1228,6 +1415,7 @@ public class DrawBoardView extends View {
 
     /**
      * 获取当前图片的高度，缩放的高度
+     *
      * @return
      */
     public int getCurrentBitmapHeight() {
@@ -1236,6 +1424,7 @@ public class DrawBoardView extends View {
 
     /**
      * 触摸时允许的容差值
+     *
      * @return
      */
     public float getTouchTolerance() {
@@ -1244,6 +1433,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置触摸时允许的容差值
+     *
      * @param touchTolerance
      */
     public void setTouchTolerance(float touchTolerance) {
@@ -1252,6 +1442,7 @@ public class DrawBoardView extends View {
 
     /**
      * 触摸点的比例
+     *
      * @return
      */
     public float getTouchPointRatio() {
@@ -1260,6 +1451,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置触摸点的比例
+     *
      * @param touchPointRatio
      */
     public void setTouchPointRatio(float touchPointRatio) {
@@ -1267,7 +1459,45 @@ public class DrawBoardView extends View {
     }
 
     /**
+     * 获取选中框颜色
+     *
+     * @return
+     */
+    public int getSelectedBoxColor() {
+        return selectedBoxColor;
+    }
+
+    /**
+     * 设置选中框颜色
+     *
+     * @param selectedBoxColor
+     */
+    public void setSelectedBoxColor(int selectedBoxColor) {
+        this.selectedBoxColor = selectedBoxColor;
+        selectedPaint.setColor(selectedBoxColor);
+    }
+
+    /**
+     * 是否显示选中框
+     *
+     * @return
+     */
+    public boolean isShowSelectedBox() {
+        return isShowSelectedBox;
+    }
+
+    /**
+     * 设置是否显示选中框
+     *
+     * @param showSelectedBox
+     */
+    public void setShowSelectedBox(boolean showSelectedBox) {
+        this.isShowSelectedBox = showSelectedBox;
+    }
+
+    /**
      * 获取画笔颜色
+     *
      * @return
      */
     public int getPaintColor() {
@@ -1276,6 +1506,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置画笔颜色
+     *
      * @param paintColor
      */
     public void setPaintColor(@ColorInt int paintColor) {
@@ -1284,12 +1515,18 @@ public class DrawBoardView extends View {
 
     /**
      * 获取触摸点的颜色
+     *
      * @return
      */
     public int getTouchPointColor() {
         return touchPointColor;
     }
 
+    /**
+     * 获取画笔的 Paint.Style
+     *
+     * @return
+     */
     @NonNull
     public Paint.Style getPaintStyle() {
         return paintStyle;
@@ -1297,6 +1534,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置画笔的 Paint.Style
+     *
      * @param paintStyle
      */
     public void setPaintStyle(@NonNull Paint.Style paintStyle) {
@@ -1310,6 +1548,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置画笔的 Shader
+     *
      * @param paintShader
      */
     public void setPaintShader(@Nullable Shader paintShader) {
@@ -1318,6 +1557,7 @@ public class DrawBoardView extends View {
 
     /**
      * 获取画笔的 Xfermode
+     *
      * @return
      */
     @Nullable
@@ -1327,12 +1567,18 @@ public class DrawBoardView extends View {
 
     /**
      * 设置画笔的 Xfermode
+     *
      * @param xfermode
      */
     public void setPaintXfermode(@Nullable Xfermode xfermode) {
         this.paintXfermode = xfermode;
     }
 
+    /**
+     * 获取画笔的 PathEffect
+     *
+     * @return
+     */
     @Nullable
     public PathEffect getPathEffect() {
         return pathEffect;
@@ -1340,12 +1586,18 @@ public class DrawBoardView extends View {
 
     /**
      * 设置画笔的 PathEffect
+     *
      * @param pathEffect
      */
     public void setPathEffect(@Nullable PathEffect pathEffect) {
         this.pathEffect = pathEffect;
     }
 
+    /**
+     * 获取画笔的 BlendMode
+     *
+     * @return
+     */
     @Nullable
     public BlendMode getBlendMode() {
         return blendMode;
@@ -1353,24 +1605,81 @@ public class DrawBoardView extends View {
 
     /**
      * 设置画笔的 BlendMode
+     *
      * @param blendMode
      */
-    @Nullable
-    @RequiresApi(Build.VERSION_CODES.Q)
     public void setBlendMode(@Nullable BlendMode blendMode) {
         this.blendMode = blendMode;
     }
 
     /**
+     * 获取画笔的 MaskFilter
+     *
+     * @return
+     */
+    @Nullable
+    public MaskFilter getMaskFilter() {
+        return maskFilter;
+    }
+
+    /**
+     * 设置画笔的 MaskFilter
+     *
+     * @param maskFilter
+     */
+    public void setMaskFilter(@Nullable MaskFilter maskFilter) {
+        this.maskFilter = maskFilter;
+    }
+
+    /**
+     * 绘制直线时是否带箭头
+     *
+     * @return
+     */
+    public boolean isDrawLineArrow() {
+        return isDrawLineArrow;
+    }
+
+    /**
+     * 设置绘制直线时是否带箭头；默认为：false；当设置为：true时，绘制直线时，结尾处将会带有箭头。
+     *
+     * @param drawLineArrow
+     */
+    public void setDrawLineArrow(boolean drawLineArrow) {
+        isDrawLineArrow = drawLineArrow;
+    }
+
+    /**
+     * 绘制直线时的箭头大小
+     *
+     * @return
+     */
+    public float getLineArrowSize() {
+        return lineArrowSize;
+    }
+
+    /**
+     * 设置绘制直线时的箭头大小
+     *
+     * @param lineArrowSize
+     */
+    public void setLineArrowSize(float lineArrowSize) {
+        this.lineArrowSize = lineArrowSize;
+    }
+
+    /**
      * 设置触摸点的颜色
+     *
      * @param touchPointColor
      */
     public void setTouchPointColor(int touchPointColor) {
         this.touchPointColor = touchPointColor;
+        pointPaint.setColor(touchPointColor);
     }
 
     /**
      * 获取绘制文本的颜色
+     *
      * @return
      */
     public int getDrawTextColor() {
@@ -1379,6 +1688,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置绘制文本的颜色
+     *
      * @param drawTextColor
      */
     public void setDrawTextColor(int drawTextColor) {
@@ -1387,6 +1697,7 @@ public class DrawBoardView extends View {
 
     /**
      * 绘制文本的字体大小
+     *
      * @param drawTextSize
      */
     public void setDrawTextSize(float drawTextSize) {
@@ -1395,6 +1706,7 @@ public class DrawBoardView extends View {
 
     /**
      * 绘制文本是否是粗体
+     *
      * @param fakeBoldText
      */
     public void setDrawTextBold(boolean fakeBoldText) {
@@ -1403,6 +1715,7 @@ public class DrawBoardView extends View {
 
     /**
      * 绘制文本是否需要下划线
+     *
      * @param underlineText
      */
     public void setDrawTextUnderline(boolean underlineText) {
@@ -1410,7 +1723,18 @@ public class DrawBoardView extends View {
     }
 
     /**
-     * 设置画笔线条描边宽度
+     * 设置选中时笔划宽度
+     *
+     * @param selectedStrokeWidth
+     */
+    public void setSelectedStrokeWidth(float selectedStrokeWidth) {
+        this.selectedStrokeWidth = selectedStrokeWidth;
+        selectedPaint.setStrokeWidth(selectedStrokeWidth);
+    }
+
+    /**
+     * 设置画笔线条笔划宽度
+     *
      * @param lineStrokeWidth
      */
     public void setLineStrokeWidth(float lineStrokeWidth) {
@@ -1418,7 +1742,8 @@ public class DrawBoardView extends View {
     }
 
     /**
-     * 设置橡皮擦描边宽度
+     * 设置橡皮擦笔划宽度
+     *
      * @param eraserStrokeWidth
      */
     public void setEraserStrokeWidth(float eraserStrokeWidth) {
@@ -1426,7 +1751,17 @@ public class DrawBoardView extends View {
     }
 
     /**
-     * 设置缩放点描边宽度
+     * 设置马赛克笔划宽度
+     *
+     * @param mosaicStrokeWidth
+     */
+    public void setMosaicStrokeWidth(float mosaicStrokeWidth) {
+        this.mosaicStrokeWidth = mosaicStrokeWidth;
+    }
+
+    /**
+     * 设置缩放点笔划宽度
+     *
      * @param zoomPointStrokeWidth
      */
     public void setZoomPointStrokeWidth(float zoomPointStrokeWidth) {
@@ -1435,6 +1770,7 @@ public class DrawBoardView extends View {
 
     /**
      * 是否自适应
+     *
      * @return
      */
     public boolean isFit() {
@@ -1443,6 +1779,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置是否自适应
+     *
      * @param fit
      */
     public void setFit(boolean fit) {
@@ -1451,6 +1788,7 @@ public class DrawBoardView extends View {
 
     /**
      * 是否启用绘图
+     *
      * @return
      */
     public boolean isDrawEnabled() {
@@ -1459,6 +1797,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置是否启用绘图
+     *
      * @param drawEnabled
      */
     public void setDrawEnabled(boolean drawEnabled) {
@@ -1467,6 +1806,7 @@ public class DrawBoardView extends View {
 
     /**
      * 是否启用缩放
+     *
      * @return
      */
     public boolean isZoomEnabled() {
@@ -1475,6 +1815,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置是否启用缩放
+     *
      * @param zoomEnabled
      */
     public void setZoomEnabled(boolean zoomEnabled) {
@@ -1483,6 +1824,7 @@ public class DrawBoardView extends View {
 
     /**
      * 是否可撤销
+     *
      * @return
      */
     public boolean isHasUndo() {
@@ -1491,6 +1833,7 @@ public class DrawBoardView extends View {
 
     /**
      * 是否可恢复
+     *
      * @return
      */
     public boolean isHasRedo() {
@@ -1499,6 +1842,7 @@ public class DrawBoardView extends View {
 
     /**
      * 获取当前图片在矩阵上的横向偏移值
+     *
      * @return
      */
     public float getCurrentTranslateX() {
@@ -1507,6 +1851,7 @@ public class DrawBoardView extends View {
 
     /**
      * 获取当前图片在矩阵上的纵向偏移值
+     *
      * @return
      */
     public float getCurrentTranslateY() {
@@ -1515,6 +1860,7 @@ public class DrawBoardView extends View {
 
     /**
      * 相对的变焦倍数
+     *
      * @return
      */
     public float getZoom() {
@@ -1523,6 +1869,7 @@ public class DrawBoardView extends View {
 
     /**
      * 真实的变焦倍数
+     *
      * @return
      */
     public float getRealZoom() {
@@ -1531,6 +1878,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置需要绘制的文本内容，当为 {@link DrawMode#DRAW_TEXT} 模式时生效
+     *
      * @param drawText
      */
     public void setDrawText(String drawText) {
@@ -1539,6 +1887,7 @@ public class DrawBoardView extends View {
 
     /**
      * 设置需要绘制的位图，当为 {@link DrawMode#DRAW_BITMAP} 模式时生效
+     *
      * @param drawBitmap
      */
     public void setDrawBitmap(Bitmap drawBitmap) {
@@ -1546,15 +1895,53 @@ public class DrawBoardView extends View {
     }
 
     /**
-     * 设置需要位置的位图锚点是否居中
-     * @param drawBitmapAnchorCenter
+     * 设置马赛克位图
+     *
+     * @param mosaicBitmap
      */
-    public void setDrawBitmapAnchorCenter(boolean drawBitmapAnchorCenter) {
-        isDrawBitmapAnchorCenter = drawBitmapAnchorCenter;
+    public void setMosaicBitmap(Bitmap mosaicBitmap) {
+        this.mosaicBitmap = mosaicBitmap;
+    }
+
+    /**
+     * 获取支持最小的放大倍数
+     *
+     * @return
+     */
+    public float getMinZoom() {
+        return minZoom;
+    }
+
+    /**
+     * 支持最小的放大倍数；默认为：1倍
+     *
+     * @param minZoom
+     */
+    public void setMinZoom(float minZoom) {
+        this.minZoom = minZoom;
+    }
+
+    /**
+     * 获取支持最大的放大倍数
+     *
+     * @return
+     */
+    public float getMaxZoom() {
+        return maxZoom;
+    }
+
+    /**
+     * 设置支持最大的放大倍数；默认为：4倍
+     *
+     * @param maxZoom
+     */
+    public void setMaxZoom(float maxZoom) {
+        this.maxZoom = maxZoom;
     }
 
     /**
      * 缩放监听
+     *
      * @param onZoomListener
      */
     public void setOnZoomListener(OnZoomListener onZoomListener) {
@@ -1564,28 +1951,32 @@ public class DrawBoardView extends View {
     /**
      * 缩放监听
      */
-    public interface OnZoomListener{
+    public interface OnZoomListener {
         /**
          * 缩放更新
+         *
          * @param realZoom 图片的真实的变焦倍数
-         * @param zoom 图片的相对变焦倍数
+         * @param zoom     图片的相对变焦倍数
          */
         void onZoomUpdate(float realZoom, float zoom);
     }
 
     /**
      * 绘图监听
+     *
      * @param onDrawListener
      */
     public void setOnDrawListener(OnDrawListener onDrawListener) {
         this.onDrawListener = onDrawListener;
     }
+
     /**
      * 绘图监听
      */
-    public interface OnDrawListener{
+    public interface OnDrawListener {
         /**
          * 绘制监听
+         *
          * @param draw
          */
         void onDraw(Draw draw);

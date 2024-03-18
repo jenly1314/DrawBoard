@@ -1,7 +1,7 @@
 //App
 def app_version = [:]
-app_version.versionCode = 2
-app_version.versionName = "1.0.1"
+app_version.versionCode = 3
+app_version.versionName = "1.1.0"
 ext.app_version = app_version
 
 //build version
@@ -14,19 +14,16 @@ ext.build_versions = build_versions
 
 //App dependencies
 def versions = [:]
-versions.mavenPublish = '0.18.0'
-versions.dokka = "1.5.0"
-versions.gradle = "4.2.2"
-versions.kotlin = "1.5.31"
 versions.appcompat = "1.2.0"
-versions.coreKtx = "1.3.2"
+versions.annotation = "1.2.0"
+versions.coreKtx = "1.6.0"
 versions.material = "1.3.0"
 versions.constraintlayout = "2.0.4"
+
 versions.junit = "4.13.1"
 versions.androidExtJunit = "1.1.2"
 versions.espressoCore = "3.3.0"
 
-versions.kotlinxCoroutines = "1.5.2"
 versions.lifecycleKtx="2.3.1"
 
 ext.versions = versions
