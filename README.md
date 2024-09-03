@@ -124,7 +124,7 @@ DrawMode.ERASER
 DrawMode.MOSAIC
 
 ```
-> 如果以上操作不完全满足你的需求，`DrawBoard`对外还提供了很多可定制化的配置（例如：自实现一个 [**Draw**](drawboard/src/main/java/com/king/drawboard/draw/Draw.java)）。
+> 如果以上操作不完全满足你的需求，`DrawBoard`对外还提供了很多可定制化的配置（例如：自实现一个 [`Draw`](drawboard/src/main/java/com/king/drawboard/draw/Draw.java)）。
 
 ```kotlin
 /**
@@ -182,9 +182,11 @@ drawBoardView.getResultBitmap()
 
 ```
 
-更多使用详情，请查看[Demo](app)中的源码使用示例或直接查看[API帮助文档](https://jitpack.io/com/github/jenly1314/DrawBoard/latest/javadoc/)
+更多使用详情，请查看[app](app)中的源码使用示例或直接查看[API帮助文档](https://jenly1314.github.io/DrawBoard/api/)
 
-## 版本记录
+<!-- end -->
+
+## 版本日志
 
 #### v1.1.0：2024-3-18
 * 新增支持绘制马赛克
@@ -193,11 +195,7 @@ drawBoardView.getResultBitmap()
 * 对外提供更多绘制相关配置
 * 更新Gradle至v7.5
 
-#### v1.0.1：2022-2-17
-* 对外提供更多Paint相关配置
-
-#### v1.0.0：2021-11-30
-* DrawBoard初始版本
+#### [查看更多版本日志](CHANGELOG.md)
 
 ## 赞赏
 如果你喜欢DrawBoard，或感觉DrawBoard帮助到了你，可以点右上角“Star”支持一下，你的支持就是我的动力，谢谢 :smiley:
@@ -223,4 +221,4 @@ drawBoardView.getResultBitmap()
    <img src="https://jenly1314.github.io/image/page/footer.png">
 </div>
 
-   
+
