@@ -184,6 +184,10 @@ drawBoardView.getResultBitmap()
 
 更多使用详情，请查看[app](app)中的源码使用示例或直接查看[API帮助文档](https://jenly1314.github.io/DrawBoard/api/)
 
+## 相关推荐
+
+- [ImageViewer](https://github.com/jenly1314/ImageViewer) 一个图片查看器，一般用来查看图片详情或查看大图时使用。
+
 <!-- end -->
 
 ## 版本日志
